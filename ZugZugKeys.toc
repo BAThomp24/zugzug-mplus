@@ -2,7 +2,7 @@
 ## Title: ZugZug Keys — Mythic+ Tools
 ## Notes: Mythic+ tools and tweaks — a companion to ZugZug. Broadcasts your key start time + estimated finish to your BNet status. More features coming.
 ## Author: ZUGZUG.io
-## Version: 1.0.0
+## Version: @project-version@
 ## SavedVariables: ZugZugKeysDB
 ## DefaultState: enabled
 ## X-Website: https://zugzug.info
