@@ -1,5 +1,5 @@
 ----------------------------------------------------------------------
--- ZugZug M+ — BNet Broadcast (Key Start)
+-- ZugZug Keys — BNet Broadcast (Key Start)
 -- One-shot Battle.net custom-message broadcast posted right when the
 -- key is started — before the challenge-mode chat lockdown kicks in.
 -- Format:
@@ -10,7 +10,7 @@
 -- APIs accept writes but the server silently rejects self-edits.
 ----------------------------------------------------------------------
 
-local MPlus = _G.ZugZugMPlus
+local Keys = _G.ZugZugKeys
 
 local BNET_MSG_MAX = 120
 local RESTORE_DELAY = 60        -- seconds before restoring the previous BNet message
@@ -35,7 +35,7 @@ local function format12h(h, m)
 end
 
 local function formatStartBroadcast()
-  local s = MPlus.state
+  local s = Keys.state
   if not s.keyTimeLimit then return nil end
 
   local h, m = GetGameTime()             -- realm/server time
@@ -54,13 +54,13 @@ local function formatStartBroadcast()
 end
 
 local function formatCompleteBroadcast()
-  local s = MPlus.state
+  local s = Keys.state
   local elapsed = s.keyStartTime and (GetTime() - s.keyStartTime) or 0
   local label = s.keyName or "key"
   if s.keyLevel and s.keyLevel > 0 then label = "+" .. s.keyLevel .. " " .. label end
   local mins = math.floor(elapsed / 60)
   local secs = math.floor(elapsed % 60)
-  return truncate(string.format("%s Done in %d:%02d (ZugZug M+)", label, mins, secs), BNET_MSG_MAX)
+  return truncate(string.format("%s Done in %d:%02d (ZugZug Keys)", label, mins, secs), BNET_MSG_MAX)
 end
 
 ----------------------------------------------------------------------
@@ -93,17 +93,17 @@ end
 ----------------------------------------------------------------------
 
 local function onKeyStart()
-  if not ZugZugMPlusDB.bnStatus then return end
+  if not ZugZugKeysDB.bnStatus then return end
   prevBnMessage = readBnMessage()
   local text = formatStartBroadcast()
-  if ZugZugMPlusDB.mpDebug then
-    print("|cffFFAA00ZZMP key start broadcast:|r " .. tostring(text))
+  if ZugZugKeysDB.mpDebug then
+    print("|cffFFAA00ZZK key start broadcast:|r " .. tostring(text))
   end
   if text then setBnMessage(text) end
 end
 
 local function onKeyComplete()
-  if not ZugZugMPlusDB.bnStatus then return end
+  if not ZugZugKeysDB.bnStatus then return end
   local text = formatCompleteBroadcast()
   if text then setBnMessage(text) end
   -- Restore the previous BNet message after a short delay so the "Done" line
@@ -115,28 +115,28 @@ local function onKeyComplete()
 end
 
 local function onKeyReset()
-  if not ZugZugMPlusDB.bnStatus then return end
+  if not ZugZugKeysDB.bnStatus then return end
   if prevBnMessage then setBnMessage(prevBnMessage) end
   prevBnMessage = nil
 end
 
-MPlus.on("keyStart",    onKeyStart)
-MPlus.on("keyComplete", onKeyComplete)
-MPlus.on("keyReset",    onKeyReset)
+Keys.on("keyStart",    onKeyStart)
+Keys.on("keyComplete", onKeyComplete)
+Keys.on("keyReset",    onKeyReset)
 
 ----------------------------------------------------------------------
--- Exposed for /zzmp commands
+-- Exposed for /zzk commands
 ----------------------------------------------------------------------
 
 --- Re-fire the start broadcast on demand (uses current key state).
-function MPlus.refreshStatus()
+function Keys.refreshStatus()
   onKeyStart()
 end
 
 --- Send arbitrary text via BNet, regardless of key state. Used by
---- /zzmp forcebcast to verify the pipeline outside a key.
-function MPlus.sendStatusNow(text)
-  if not text or text == "" or not ZugZugMPlusDB.bnStatus then return false end
+--- /zzk forcebcast to verify the pipeline outside a key.
+function Keys.sendStatusNow(text)
+  if not text or text == "" or not ZugZugKeysDB.bnStatus then return false end
   setBnMessage(truncate(text, BNET_MSG_MAX))
   return true
 end

@@ -1,10 +1,10 @@
 ----------------------------------------------------------------------
--- ZugZug M+ — Settings Panel
--- Registered under "ZugZug M+" in the Blizzard AddOns options. Each
+-- ZugZug Keys — Settings Panel
+-- Registered under "ZugZug Keys" in the Blizzard AddOns options. Each
 -- feature is its own toggle; all default off.
 ----------------------------------------------------------------------
 
-local MPlus = _G.ZugZugMPlus
+local Keys = _G.ZugZugKeys
 
 local function CreateToggle(parent, x, y, label, dbKey, subtitle)
   local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
@@ -12,20 +12,20 @@ local function CreateToggle(parent, x, y, label, dbKey, subtitle)
   cb.text = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
   cb.text:SetPoint("LEFT", cb, "RIGHT", 4, 0)
   cb.text:SetText(label .. (subtitle and ("  |cff888888" .. subtitle .. "|r") or ""))
-  cb:SetChecked(ZugZugMPlusDB[dbKey])
+  cb:SetChecked(ZugZugKeysDB[dbKey])
   cb:SetScript("OnClick", function(self)
-    ZugZugMPlusDB[dbKey] = self:GetChecked()
+    ZugZugKeysDB[dbKey] = self:GetChecked()
   end)
   return cb
 end
 
 local function CreateSettingsPanel()
-  local canvas = CreateFrame("Frame", "ZugZugMPlusSettingsPanel")
-  canvas.name = "ZugZug M+"
+  local canvas = CreateFrame("Frame", "ZugZugKeysSettingsPanel")
+  canvas.name = "ZugZug Keys"
 
   local title = canvas:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
   title:SetPoint("TOPLEFT", 16, -16)
-  title:SetText("|cff8fbf3fZugZug|r M+ Settings")
+  title:SetText("|cff8fbf3fZugZug|r Keys Settings")
 
   local sub = canvas:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
@@ -53,85 +53,85 @@ frame:SetScript("OnEvent", function(self)
     local panel = CreateSettingsPanel()
     local category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
     Settings.RegisterAddOnCategory(category)
-    MPlus.settingsCategory = category
+    Keys.settingsCategory = category
   end)
   if not ok then
-    print("|cff8fbf3fZugZug M+:|r Settings panel failed: " .. tostring(err))
+    print("|cff8fbf3fZugZug Keys:|r Settings panel failed: " .. tostring(err))
   end
   self:UnregisterEvent("PLAYER_LOGIN")
 end)
 
 ----------------------------------------------------------------------
--- /zzmp slash command — open settings + show toggles state
+-- /zzk slash command — open settings + show toggles state
 ----------------------------------------------------------------------
 
-SLASH_ZUGZUGMPLUS1 = "/zzmp"
-SLASH_ZUGZUGMPLUS2 = "/mplus"
-SlashCmdList["ZUGZUGMPLUS"] = function(msg)
+SLASH_ZUGZUGKEYS1 = "/zzk"
+SLASH_ZUGZUGKEYS2 = "/zzkeys"
+SlashCmdList["ZUGZUGKEYS"] = function(msg)
   local cmd = (msg and msg:match("^(%S+)") or ""):lower()
   if cmd == "settings" or cmd == "options" or cmd == "config" or cmd == "" then
     local ok = pcall(function()
-      if MPlus.settingsCategory then
-        Settings.OpenToCategory(MPlus.settingsCategory:GetID())
+      if Keys.settingsCategory then
+        Settings.OpenToCategory(Keys.settingsCategory:GetID())
       else
-        Settings.OpenToCategory("ZugZug M+")
+        Settings.OpenToCategory("ZugZug Keys")
       end
     end)
-    if not ok then print("|cff8fbf3fZugZug M+:|r Could not open settings.") end
+    if not ok then print("|cff8fbf3fZugZug Keys:|r Could not open settings.") end
     return
   end
   if cmd == "debug" then
-    ZugZugMPlusDB.mpDebug = not ZugZugMPlusDB.mpDebug
-    print("|cff8fbf3fZugZug M+:|r debug "
-      .. (ZugZugMPlusDB.mpDebug and "|cff4DFF4Don|r" or "|cffFF6666off|r"))
+    ZugZugKeysDB.mpDebug = not ZugZugKeysDB.mpDebug
+    print("|cff8fbf3fZugZug Keys:|r debug "
+      .. (ZugZugKeysDB.mpDebug and "|cff4DFF4Don|r" or "|cffFF6666off|r"))
     return
   end
   if cmd == "refresh" then
-    if MPlus.refreshStatus then
-      MPlus.refreshStatus()
-      print("|cff8fbf3fZugZug M+:|r status refreshed (broadcast updated if in a key + toggle on)")
+    if Keys.refreshStatus then
+      Keys.refreshStatus()
+      print("|cff8fbf3fZugZug Keys:|r status refreshed (broadcast updated if in a key + toggle on)")
     else
-      print("|cff8fbf3fZugZug M+:|r refresh unavailable (Status module not loaded)")
+      print("|cff8fbf3fZugZug Keys:|r refresh unavailable (Status module not loaded)")
     end
     return
   end
   if cmd == "forcebcast" or cmd == "force" then
-    if not MPlus.sendStatusNow then
-      print("|cff8fbf3fZugZug M+:|r forcebcast unavailable (Status module not loaded)")
+    if not Keys.sendStatusNow then
+      print("|cff8fbf3fZugZug Keys:|r forcebcast unavailable (Status module not loaded)")
       return
     end
     local rest = msg:match("^%S+%s+(.+)$")
-    local text = rest or ("ZZMP test " .. date("%H:%M:%S"))
-    local bn = MPlus.sendStatusNow(text)
-    print(string.format("|cff8fbf3fZugZug M+:|r forced broadcast: '%s'  (bn=%s)", text, tostring(bn)))
-    if not ZugZugMPlusDB.bnStatus then
+    local text = rest or ("ZZK test " .. date("%H:%M:%S"))
+    local bn = Keys.sendStatusNow(text)
+    print(string.format("|cff8fbf3fZugZug Keys:|r forced broadcast: '%s'  (bn=%s)", text, tostring(bn)))
+    if not ZugZugKeysDB.bnStatus then
       print("  |cffFF6666BNet toggle is off — nothing was sent.|r")
     end
     return
   end
   if cmd == "status" then
-    print("|cff8fbf3fZugZug M+:|r feature toggles —")
-    print("  BNet Status: " .. (ZugZugMPlusDB.bnStatus and "|cff4DFF4Don|r" or "|cffFF6666off|r"))
+    print("|cff8fbf3fZugZug Keys:|r feature toggles —")
+    print("  BNet Status: " .. (ZugZugKeysDB.bnStatus and "|cff4DFF4Don|r" or "|cffFF6666off|r"))
     return
   end
   if cmd == "testbcast" or cmd == "testbroadcast" then
-    local s = MPlus.state
-    print("|cff8fbf3fZugZug M+:|r diagnostic —")
+    local s = Keys.state
+    print("|cff8fbf3fZugZug Keys:|r diagnostic —")
     print(string.format("  inActiveKey=%s · keyName=%s · keyLevel=%s · keyTimeLimit=%s",
       tostring(s.inActiveKey), tostring(s.keyName), tostring(s.keyLevel), tostring(s.keyTimeLimit)))
     print(string.format("  setting bnStatus=%s · API BNSetCustomMessage=%s",
-      tostring(ZugZugMPlusDB.bnStatus), tostring(BNSetCustomMessage ~= nil)))
+      tostring(ZugZugKeysDB.bnStatus), tostring(BNSetCustomMessage ~= nil)))
     if BNSetCustomMessage then
-      local ok, err = pcall(BNSetCustomMessage, "ZZMP test " .. date("%H:%M:%S"))
+      local ok, err = pcall(BNSetCustomMessage, "ZZK test " .. date("%H:%M:%S"))
       print("  BNSetCustomMessage call: ok=" .. tostring(ok) .. (ok and "" or (" err=" .. tostring(err))))
     end
     return
   end
-  print("|cff8fbf3fZugZug M+|r — Mythic+ tools")
-  print("  /zzmp settings  — open the settings panel")
-  print("  /zzmp status    — show which features are on")
-  print("  /zzmp refresh   — re-fire the key-start broadcast for the current key")
-  print("  /zzmp forcebcast [text] — push text to BNet (works outside a key)")
-  print("  /zzmp testbcast — diagnose the BNet broadcast API")
-  print("  /zzmp debug     — toggle verbose event logging")
+  print("|cff8fbf3fZugZug Keys|r — Mythic+ tools")
+  print("  /zzk settings  — open the settings panel")
+  print("  /zzk status    — show which features are on")
+  print("  /zzk refresh   — re-fire the key-start broadcast for the current key")
+  print("  /zzk forcebcast [text] — push text to BNet (works outside a key)")
+  print("  /zzk testbcast — diagnose the BNet broadcast API")
+  print("  /zzk debug     — toggle verbose event logging")
 end
