@@ -1,0 +1,12 @@
+## Interface: 120005
+## Title: ZugZug M+
+## Notes: Mythic+ tools and tweaks — a companion to ZugZug. Time auto-reply, status broadcasts, more coming.
+## Author: ZUGZUG.io
+## Version: 1.0.0
+## SavedVariables: ZugZugMPlusDB
+## DefaultState: enabled
+## X-Website: https://zugzug.info
+
+Core.lua
+Status.lua
+Settings.lua
