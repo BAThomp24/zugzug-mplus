@@ -7,7 +7,7 @@
 ## DefaultState: enabled
 ## X-Website: https://zugzug.info
 ## X-Curse-Project-ID: zugzug-keys
-## X-Category: Dungeons &amp; Raids
+## X-Category: Dungeons & Raids
 
 Core.lua
 Status.lua
