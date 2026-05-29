@@ -15,7 +15,9 @@ local Keys = _G.ZugZugKeys
 local BNET_MSG_MAX = 120
 local RESTORE_DELAY = 60        -- seconds before restoring the previous BNet message
 
-local prevBnMessage = nil       -- saved before we overwrite, restored after key
+-- The previous BNet custom message is persisted in ZugZugKeysDB._prevBnMessage
+-- so it survives /reload and so a second key starting within RESTORE_DELAY of
+-- the first finishing can't overwrite the user's original with our own text.
 
 local function truncate(text, maxLen)
   if not text then return "" end
@@ -55,7 +57,14 @@ end
 
 local function formatCompleteBroadcast()
   local s = Keys.state
-  local elapsed = s.keyStartTime and (GetTime() - s.keyStartTime) or 0
+  -- Prefer the persisted epoch (survives /reload). Fall back to in-memory
+  -- GetTime() only if the epoch is somehow missing.
+  local elapsed = 0
+  if ZugZugKeysDB._keyStartEpoch then
+    elapsed = time() - ZugZugKeysDB._keyStartEpoch
+  elseif s.keyStartTime then
+    elapsed = GetTime() - s.keyStartTime
+  end
   local label = s.keyName or "key"
   if s.keyLevel and s.keyLevel > 0 then label = "+" .. s.keyLevel .. " " .. label end
   local mins = math.floor(elapsed / 60)
@@ -98,7 +107,12 @@ local function onKeyStart()
   -- so a recovery path can't accidentally fire a second broadcast with the
   -- wrong "Started:" timestamp.
   if ZugZugKeysDB._startBroadcastSent then return end
-  prevBnMessage = readBnMessage()
+  -- Only capture the user's prior message if we don't already have one stored.
+  -- This avoids overwriting it with our own "Done in X:YY" text if a second
+  -- key starts inside the previous key's RESTORE_DELAY window.
+  if not ZugZugKeysDB._prevBnMessage then
+    ZugZugKeysDB._prevBnMessage = readBnMessage()
+  end
   local text = formatStartBroadcast()
   if ZugZugKeysDB.mpDebug then
     print("|cffFFAA00ZZK key start broadcast:|r " .. tostring(text))
@@ -110,23 +124,41 @@ local function onKeyStart()
 end
 
 local function onKeyComplete()
+  -- Snapshot whether WE set a message during this run before we clear the
+  -- flag. If we never broadcasted (toggle was off the whole time), there is
+  -- nothing to restore even if a stale _prevBnMessage exists in the DB.
+  local weBroadcasted = ZugZugKeysDB._startBroadcastSent
   ZugZugKeysDB._startBroadcastSent = nil
-  if not ZugZugKeysDB.bnStatus then return end
-  local text = formatCompleteBroadcast()
-  if text then setBnMessage(text) end
-  -- Restore the previous BNet message after a short delay so the "Done" line
-  -- lingers briefly but doesn't stay forever.
-  C_Timer.After(RESTORE_DELAY, function()
-    if prevBnMessage then setBnMessage(prevBnMessage) end
-    prevBnMessage = nil
-  end)
+
+  if ZugZugKeysDB.bnStatus then
+    local text = formatCompleteBroadcast()
+    if text then setBnMessage(text) end
+  end
+
+  -- Restore the user's original message regardless of the current toggle:
+  -- if we overwrote it earlier, we owe them a restore. Gate the restore on
+  -- inActiveKey so a new key starting within RESTORE_DELAY doesn't get its
+  -- start broadcast clobbered by this restore.
+  if weBroadcasted and ZugZugKeysDB._prevBnMessage then
+    C_Timer.After(RESTORE_DELAY, function()
+      if Keys.state.inActiveKey then return end
+      if ZugZugKeysDB._prevBnMessage then
+        setBnMessage(ZugZugKeysDB._prevBnMessage)
+        ZugZugKeysDB._prevBnMessage = nil
+      end
+    end)
+  end
 end
 
 local function onKeyReset()
+  local weBroadcasted = ZugZugKeysDB._startBroadcastSent
   ZugZugKeysDB._startBroadcastSent = nil
-  if not ZugZugKeysDB.bnStatus then return end
-  if prevBnMessage then setBnMessage(prevBnMessage) end
-  prevBnMessage = nil
+  -- Reset/abandon → restore immediately (no point delaying like on complete).
+  -- Honor restore regardless of bnStatus toggle for the same reason as above.
+  if weBroadcasted and ZugZugKeysDB._prevBnMessage then
+    setBnMessage(ZugZugKeysDB._prevBnMessage)
+    ZugZugKeysDB._prevBnMessage = nil
+  end
 end
 
 Keys.on("keyStart",    onKeyStart)

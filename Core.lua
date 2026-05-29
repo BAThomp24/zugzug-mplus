@@ -101,6 +101,13 @@ local function captureKeyInfo()
   s.keyName, s.keyLevel, s.keyTimeLimit = nil, nil, nil
   s.bossesKilled = 0
 
+  -- Persist epoch start so elapsed time on completion survives /reload.
+  -- Only set if absent so recovery preserves the real start instead of
+  -- overwriting with the reload moment.
+  if not ZugZugKeysDB._keyStartEpoch then
+    ZugZugKeysDB._keyStartEpoch = time()
+  end
+
   local mapID
   local ok, id = pcall(C_ChallengeMode.GetActiveChallengeMapID)
   if ok then mapID = Keys.safeNum(id) end
@@ -166,19 +173,26 @@ frame:SetScript("OnEvent", function(_, event, arg1, ...)
         end
       end
     else
+      -- If we had a key going (either in-memory or persisted from a prior
+      -- session that crashed), treat leaving the dungeon as an abandon so
+      -- feature modules can clean up (restore BNet message, etc.).
+      if s.inActiveKey or ZugZugKeysDB._keyStartEpoch then
+        Keys.fire("keyReset")
+      end
       s.instanceEnterTime = nil
       s.inActiveKey = false
       s.keyStartTime = nil
-      -- Outside any dungeon → clear any stale start-broadcast flag so the
-      -- next real key start can broadcast (e.g. previous key was abandoned
-      -- without firing CHALLENGE_MODE_COMPLETED or _RESET).
       ZugZugKeysDB._startBroadcastSent = nil
+      ZugZugKeysDB._keyStartEpoch = nil
       cacheMapInfo()
     end
     return
   end
 
   if event == "CHALLENGE_MODE_START" then
+    -- Fresh key → reset the persisted epoch so captureKeyInfo records the
+    -- real start, not a stale value from a previous run.
+    ZugZugKeysDB._keyStartEpoch = nil
     captureKeyInfo()
     Keys.state.instanceEnterTime = GetTime()
     Keys.fire("keyStart")
@@ -209,6 +223,7 @@ frame:SetScript("OnEvent", function(_, event, arg1, ...)
     Keys.fire("keyComplete")
     Keys.state.inActiveKey = false
     Keys.state.keyStartTime = nil
+    ZugZugKeysDB._keyStartEpoch = nil
     return
   end
 
@@ -216,6 +231,7 @@ frame:SetScript("OnEvent", function(_, event, arg1, ...)
     Keys.fire("keyReset")
     Keys.state.inActiveKey = false
     Keys.state.keyStartTime = nil
+    ZugZugKeysDB._keyStartEpoch = nil
     return
   end
 end)
