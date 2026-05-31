@@ -111,6 +111,16 @@ local function readBnMessage()
   return best
 end
 
+--- Detect a ZugZug-shaped broadcast so we don't capture one of our own
+--- (left over from a crashed/interrupted session) as the "previous"
+--- message we'd later restore.
+local function looksLikeZugZugBroadcast(text)
+  if type(text) ~= "string" then return false end
+  if text:match("^%+%d+.+Started:.+Finished~:") then return true end
+  if text:match("^%+%d+.+Done in.+%(ZugZug") then return true end
+  return false
+end
+
 ----------------------------------------------------------------------
 -- Lifecycle hooks
 ----------------------------------------------------------------------
@@ -128,10 +138,16 @@ local function onKeyStart()
   local text = formatStartBroadcast()
   if not text then return end
   -- Capture the user's prior message now that we know we'll overwrite it.
-  -- Don't overwrite a previously-saved value (handles a second key starting
-  -- inside the previous key's RESTORE_DELAY window).
+  -- Skip if it already looks like a ZugZug broadcast — that means a previous
+  -- session crashed or didn't clean up, and restoring it would just leak a
+  -- stale "Started:/Done in" line back onto the status. Don't overwrite a
+  -- previously-saved value either (handles a second key starting inside the
+  -- previous key's RESTORE_DELAY window).
   if not ZugZugKeysDB._prevBnMessage then
-    ZugZugKeysDB._prevBnMessage = readBnMessage()
+    local current = readBnMessage()
+    if current and not looksLikeZugZugBroadcast(current) then
+      ZugZugKeysDB._prevBnMessage = current
+    end
   end
   if ZugZugKeysDB.mpDebug then
     print("|cffFFAA00ZZK key start broadcast:|r " .. tostring(text))
@@ -155,17 +171,18 @@ local function onKeyComplete()
     if text then setBnMessage(text) end
   end
 
-  -- Restore the user's original message regardless of the current toggle:
-  -- if we overwrote it earlier, we owe them a restore. Gate the restore on
-  -- inActiveKey so a new key starting within RESTORE_DELAY doesn't get its
-  -- start broadcast clobbered by this restore.
-  if weBroadcasted and ZugZugKeysDB._prevBnMessage then
+  -- Always clean up the BNet status if we set anything earlier — restore the
+  -- captured pre-key message if we have one, otherwise clear to blank. We
+  -- never want to leave a stale "Started:" / "Done in" line sitting on the
+  -- user's broadcast. Gate on inActiveKey so a new key starting within
+  -- RESTORE_DELAY doesn't get its start broadcast clobbered.
+  if weBroadcasted then
     C_Timer.After(RESTORE_DELAY, function()
       if Keys.state.inActiveKey then return end
-      if ZugZugKeysDB._prevBnMessage then
-        setBnMessage(ZugZugKeysDB._prevBnMessage)
-        ZugZugKeysDB._prevBnMessage = nil
-      end
+      local restore = ZugZugKeysDB._prevBnMessage
+      if restore and looksLikeZugZugBroadcast(restore) then restore = nil end
+      setBnMessage(restore or "")
+      ZugZugKeysDB._prevBnMessage = nil
     end)
   end
 end
@@ -173,10 +190,12 @@ end
 local function onKeyReset()
   local weBroadcasted = ZugZugKeysDB._startBroadcastSent
   ZugZugKeysDB._startBroadcastSent = nil
-  -- Reset/abandon → restore immediately (no point delaying like on complete).
-  -- Honor restore regardless of bnStatus toggle for the same reason as above.
-  if weBroadcasted and ZugZugKeysDB._prevBnMessage then
-    setBnMessage(ZugZugKeysDB._prevBnMessage)
+  -- Reset/abandon → clean up immediately. Same restore-or-clear logic as
+  -- onKeyComplete.
+  if weBroadcasted then
+    local restore = ZugZugKeysDB._prevBnMessage
+    if restore and looksLikeZugZugBroadcast(restore) then restore = nil end
+    setBnMessage(restore or "")
     ZugZugKeysDB._prevBnMessage = nil
   end
 end
